@@ -1,0 +1,768 @@
+<title>iQFoil Fleet Evolution — Live Training</title>
+<style>
+  :root {
+    --sea-deep: #B9D4E2;
+    --sea-far: #D3E4EE;
+    --sky: #EDF4F8;
+    --surface: #F2F7FA;
+    --card: #FFFFFF;
+    --ink: #16324A;
+    --ink-2: #48657D;
+    --ink-3: #7E93A6;
+    --line: #D5E1EA;
+    --model: #E8622C;
+    --rival: #0E9AB4;
+    --ghost: #8DA3B5;
+    --shadow: 0 1px 2px rgba(22, 50, 74, 0.08), 0 4px 16px rgba(22, 50, 74, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --sea-deep: #10293D;
+      --sea-far: #16334A;
+      --sky: #0E2233;
+      --surface: #0B1C2B;
+      --card: #12283A;
+      --ink: #E4EDF4;
+      --ink-2: #9FB4C6;
+      --ink-3: #6C8399;
+      --line: #24425A;
+      --model: #E25428;
+      --rival: #1BA3BD;
+      --ghost: #55708A;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 18px rgba(0, 0, 0, 0.28);
+    }
+  }
+  :root[data-theme="dark"] {
+    --sea-deep: #10293D;
+    --sea-far: #16334A;
+    --sky: #0E2233;
+    --surface: #0B1C2B;
+    --card: #12283A;
+    --ink: #E4EDF4;
+    --ink-2: #9FB4C6;
+    --ink-3: #6C8399;
+    --line: #24425A;
+    --model: #E25428;
+    --rival: #1BA3BD;
+    --ghost: #55708A;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 18px rgba(0, 0, 0, 0.28);
+  }
+  :root[data-theme="light"] {
+    --sea-deep: #B9D4E2;
+    --sea-far: #D3E4EE;
+    --sky: #EDF4F8;
+    --surface: #F2F7FA;
+    --card: #FFFFFF;
+    --ink: #16324A;
+    --ink-2: #48657D;
+    --ink-3: #7E93A6;
+    --line: #D5E1EA;
+    --model: #E8622C;
+    --rival: #0E9AB4;
+    --ghost: #8DA3B5;
+    --shadow: 0 1px 2px rgba(22, 50, 74, 0.08), 0 4px 16px rgba(22, 50, 74, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: "Avenir Next", "Avenir", -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+
+  .eyebrow {
+    font-family: "Futura", "Avenir Next Condensed", "Avenir Next", sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--model);
+    font-weight: 600;
+  }
+  h1 {
+    font-family: "Futura", "Avenir Next Condensed", "Avenir Next", sans-serif;
+    font-size: clamp(26px, 4.5vw, 40px);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    margin: 4px 0 6px;
+    text-wrap: balance;
+  }
+  .sub { color: var(--ink-2); max-width: 64ch; margin: 0; }
+
+  header { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  button, select {
+    font-family: "Futura", "Avenir Next Condensed", "Avenir Next", sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--model); outline-offset: 2px; }
+  button.primary { background: var(--model); border-color: var(--model); color: #fff; }
+  button:hover { border-color: var(--ink-3); }
+  button.primary:hover { border-color: var(--model); filter: brightness(1.06); }
+
+  .race-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; }
+  canvas#race { display: block; width: 100%; height: auto; }
+
+  .instruments {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin: 14px 0 22px;
+  }
+  .tile {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px 10px;
+  }
+  .tile .label {
+    font-family: "Futura", "Avenir Next Condensed", "Avenir Next", sans-serif;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+  }
+  .tile .value {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 22px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .tile .value small { font-size: 13px; color: var(--ink-3); font-weight: 500; }
+  .tile.model-tile .value { color: var(--model); }
+
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .charts { grid-template-columns: 1fr; } }
+  figure.chart {
+    margin: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 16px 16px 10px;
+    position: relative;
+  }
+  figure.chart h2 {
+    font-family: "Futura", "Avenir Next Condensed", "Avenir Next", sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 0 0 2px;
+  }
+  figure.chart p.desc { font-size: 13px; color: var(--ink-2); margin: 0 0 8px; }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-2); margin: 6px 0 0; flex-wrap: wrap; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+
+  svg text { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px; fill: var(--ink-3); }
+  .gridline { stroke: var(--line); stroke-width: 1; }
+  .axisline { stroke: var(--ink-3); stroke-width: 1; }
+  .s-best { stroke: var(--model); stroke-width: 2; fill: none; }
+  .s-mean { stroke: var(--rival); stroke-width: 2; fill: none; }
+  .s-time { stroke: var(--model); stroke-width: 2; fill: none; }
+
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--ink);
+    color: var(--surface);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+    transform: translate(-50%, -130%);
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  details.data-table { margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+  details.data-table summary { cursor: pointer; }
+  details.data-table .scroll { overflow-x: auto; max-height: 240px; overflow-y: auto; }
+  details.data-table table { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  details.data-table td, details.data-table th { border: 1px solid var(--line); padding: 3px 8px; text-align: right; }
+
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 22px; }
+  .note { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .note h3 {
+    font-family: "Futura", "Avenir Next Condensed", "Avenir Next", sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+    color: var(--model);
+  }
+  .note p { font-size: 13.5px; color: var(--ink-2); margin: 0; }
+  .note code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--ink); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">The 35 to 24 Project · Session Tracker M8 preview</div>
+      <h1>Fleet Evolution — Course Racing</h1>
+      <p class="sub">1,000 boards, each steered by its own tiny neural network, sail a full iQFoil
+        course: hold behind the line in the start sequence, beat upwind to Mark 1, run to a
+        leeward gate (left or right — their call), upwind again, reach to Mark 3, and a final
+        half-wind sprint to the finish. Nobody taught them any of it.</p>
+    </div>
+    <div class="controls">
+      <button id="runBtn" class="primary">Start evolution</button>
+      <button id="skipBtn">Skip 1 gen</button>
+      <select id="speedSel" aria-label="Simulation speed">
+        <option value="0.25">1× — watch</option>
+        <option value="1">4×</option>
+        <option value="3" selected>12×</option>
+        <option value="10">40× — train fast</option>
+      </select>
+      <button id="resetBtn">Reset fleet</button>
+    </div>
+  </header>
+
+  <div class="race-card">
+    <canvas id="race" width="1080" height="700" role="img"
+      aria-label="Top-down race course. Wind blows from the top. One thousand boats hold below the start line during the countdown, then race up to Mark 1, down through a two-buoy gate, up to Mark 1 again, across to Mark 3 on the lower left, and finish through a line below the start. Orange boats lead, teal chase, grey is the rest of the fleet."></canvas>
+  </div>
+
+  <div class="instruments">
+    <div class="tile"><div class="label">Generation</div><div class="value" id="genV">1</div></div>
+    <div class="tile"><div class="label">Race clock</div><div class="value" id="clockV">—</div></div>
+    <div class="tile"><div class="label">Leader on</div><div class="value" id="legV" style="font-size:15px">—</div></div>
+    <div class="tile"><div class="label">Gate split L / R</div><div class="value" id="gateV">0 / 0</div></div>
+    <div class="tile"><div class="label">Finished</div><div class="value" id="finV">0</div></div>
+    <div class="tile model-tile"><div class="label">Best time ever</div><div class="value" id="bestV">— <small>s</small></div></div>
+  </div>
+
+  <div class="charts">
+    <figure class="chart">
+      <h2>Fitness per generation</h2>
+      <p class="desc">Course progress score. Best boat vs fleet average — the gap closing means the whole fleet is learning.</p>
+      <svg id="fitSvg" viewBox="0 0 500 300" width="100%" aria-label="Line chart of best and mean fitness rising over generations"></svg>
+      <div class="legend">
+        <span class="key"><span class="swatch" style="background: var(--model)"></span>Best boat</span>
+        <span class="key"><span class="swatch" style="background: var(--rival)"></span>Fleet mean</span>
+      </div>
+      <div class="tooltip" id="fitTip"></div>
+      <details class="data-table">
+        <summary>View history as table</summary>
+        <div class="scroll"><table id="histTable"></table></div>
+      </details>
+    </figure>
+
+    <figure class="chart">
+      <h2>Best race time</h2>
+      <p class="desc">Fastest finisher per generation, seconds after the gun. Blank until the first boat survives all six legs.</p>
+      <svg id="timeSvg" viewBox="0 0 500 300" width="100%" aria-label="Line chart of best race time decreasing over generations"></svg>
+      <div class="tooltip" id="timeTip"></div>
+    </figure>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <h3>The course</h3>
+      <p>Real iQFoil shape: start sequence (compressed to 18s here — real racing uses 3 minutes),
+        line closed until the gun, upwind beat, leeward gate with a free left/right choice, second
+        beat, reach to Mark 3, half-wind finish. Rounding is simplified to touching the mark zone.</p>
+    </div>
+    <div class="note">
+      <h3>The learning</h3>
+      <p>Each board is a 7&nbsp;→&nbsp;8&nbsp;→&nbsp;1 net (73 weights) reading mark bearing, wind
+        angle, countdown, and leg number — output steers. An <strong>evolution strategy</strong>
+        trains them: race all 1,000, keep the top 10%, mutate, repeat. No gradients,
+        no <code>loss.backward()</code>.</p>
+    </div>
+    <div class="note">
+      <h3>What emerges</h3>
+      <p>Tacking on the beats, gybing on the run, line positioning before the gun — none of it
+        programmed. Watch the gate split: the fleet usually discovers one side pays and herds
+        there within ~30 generations, exactly like a real fleet converging on the favored side.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- theme tokens ---------- */
+let T = {};
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = (n) => cs.getPropertyValue(n).trim();
+  T = {
+    seaDeep: g("--sea-deep"), seaFar: g("--sea-far"),
+    ink: g("--ink"), ink2: g("--ink-2"), ink3: g("--ink-3"), line: g("--line"),
+    model: g("--model"), rival: g("--rival"), ghost: g("--ghost"), card: g("--card"),
+  };
+}
+readTokens();
+new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTokens);
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- sailing physics ---------- */
+const TAU = Math.PI * 2;
+const wrap = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+const WIND_FROM = -Math.PI / 2;
+const POLAR = [[0, 0.0], [25, 0.03], [35, 0.15], [45, 0.75], [60, 0.9], [80, 1.0], [110, 1.0], [135, 0.88], [160, 0.68], [180, 0.52]];
+function polar(deg) {
+  for (let i = 1; i < POLAR.length; i++) {
+    if (deg <= POLAR[i][0]) {
+      const [a, va] = POLAR[i - 1], [b, vb] = POLAR[i];
+      return va + (vb - va) * (deg - a) / (b - a);
+    }
+  }
+  return 0.52;
+}
+
+/* course in logical coordinates */
+const LW = 1080, LH = 700;
+const LINE = { x1: 420, x2: 660, y: 500, mx: 540 };
+const M1 = { x: 540, y: 95 };
+const GL = { x: 455, y: 460 }, GR = { x: 625, y: 460 };
+const M3 = { x: 240, y: 560 };
+const FINC = { x: 540, y: 590 };                      // finish line centre, crossed on a beam reach
+const R = 24;
+const VMAX = 60, TURN = 2.6, DT = 1 / 15, PRE = 18, TMAX = 80;
+const LEG_NAMES = ["Start line", "Beat to M1", "Run to gate", "Beat 2 to M1", "Reach to M3", "Final reach"];
+// legs: 0 cross start line, 1 M1, 2 gate (L or R), 3 M1 again, 4 M3, 5 finish
+const TGT = [{ x: LINE.mx, y: LINE.y }, M1, null, M1, M3, FINC];
+
+/* ---------- population: 1000 policies, 7-8-1 each ---------- */
+const N = 1000, NIN = 7, NH = 8, NP = NIN * NH + NH + NH + 1;   // 73 weights
+let rs = 123;
+const rnd = () => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 2 ** 32; };
+const gauss = () => { const u = rnd() || 1e-9, v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
+
+let pop, bx, by, bh, bleg, bfin, bgate, prog, rank;
+let gen, simT, stepAcc, genHist, bestEver, champTrail, champIdx;
+
+function gateTarget(i) {
+  return Math.hypot(GL.x - bx[i], GL.y - by[i]) < Math.hypot(GR.x - bx[i], GR.y - by[i]) ? GL : GR;
+}
+function targetOf(i) {
+  return bleg[i] === 2 ? gateTarget(i) : TGT[bleg[i]];
+}
+
+function initFleet() {
+  pop = new Float32Array(N * NP);
+  for (let i = 0; i < N * NP; i++) pop[i] = gauss() * 0.5;
+  gen = 1;
+  genHist = [];
+  bestEver = null;
+  champIdx = -1;
+  resetRace();
+  drawCharts();
+  updateTiles();
+}
+function resetRace() {
+  bx = new Float32Array(N); by = new Float32Array(N); bh = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    bx[i] = 420 + rnd() * 240;                 // scattered below the line
+    by[i] = 510 + rnd() * 60;
+    bh[i] = rnd() * TAU - Math.PI;
+  }
+  bleg = new Int8Array(N);
+  bfin = new Float32Array(N).fill(-1);
+  bgate = new Int8Array(N);                    // 0 none, 1 left, 2 right
+  prog = new Float32Array(N);
+  rank = new Int32Array(N);
+  for (let i = 0; i < N; i++) rank[i] = i;
+  simT = -PRE; stepAcc = 0;
+  champTrail = [];
+}
+
+function steer(i, inp) {
+  const o = i * NP;
+  let out = pop[o + NIN * NH + NH + NH];
+  for (let j = 0; j < NH; j++) {
+    let s = pop[o + NIN * NH + j];
+    const wo = o + j * NIN;
+    for (let k = 0; k < NIN; k++) s += pop[wo + k] * inp[k];
+    out += Math.tanh(s) * pop[o + NIN * NH + NH + j];
+  }
+  return Math.tanh(out);
+}
+
+const inp = new Float32Array(NIN);
+function simStep() {
+  const pre = simT < 0;
+  for (let i = 0; i < N; i++) {
+    if (bfin[i] >= 0) continue;
+    const tgt = pre ? TGT[0] : targetOf(i);
+    const dx = tgt.x - bx[i], dy = tgt.y - by[i];
+    const dist = Math.hypot(dx, dy);
+    const err = wrap(Math.atan2(dy, dx) - bh[i]);
+    const rw = wrap(WIND_FROM - bh[i]);
+    inp[0] = Math.sin(err); inp[1] = Math.cos(err);
+    inp[2] = Math.sin(rw);  inp[3] = Math.cos(rw);
+    inp[4] = dist / 500;
+    inp[5] = pre ? -simT / PRE : 0;            // countdown feature, 1 → 0 before the gun
+    inp[6] = bleg[i] / 5;
+    bh[i] = wrap(bh[i] + steer(i, inp) * TURN * DT);
+    const v = VMAX * polar(Math.abs(rw) * 180 / Math.PI);
+    const py = by[i];
+    bx[i] += Math.cos(bh[i]) * v * DT;
+    by[i] += Math.sin(bh[i]) * v * DT;
+
+    if (pre) {
+      // the line is a wall until the gun
+      if (by[i] < LINE.y && bx[i] > LINE.x1 - 10 && bx[i] < LINE.x2 + 10) by[i] = LINE.y + 1;
+      continue;
+    }
+    if (bleg[i] === 0) {
+      if (py >= LINE.y && by[i] < LINE.y && bx[i] >= LINE.x1 && bx[i] <= LINE.x2) bleg[i] = 1;
+    } else if (bleg[i] === 2) {
+      if (Math.hypot(GL.x - bx[i], GL.y - by[i]) < R) { bgate[i] = 1; bleg[i] = 3; }
+      else if (Math.hypot(GR.x - bx[i], GR.y - by[i]) < R) { bgate[i] = 2; bleg[i] = 3; }
+    } else if (Math.hypot(tgt.x - bx[i], tgt.y - by[i]) < R) {
+      if (bleg[i] === 5) bfin[i] = simT;
+      else bleg[i]++;
+    }
+  }
+  simT += DT;
+  if (champIdx >= 0 && bfin[champIdx] < 0) champTrail.push(bx[champIdx], by[champIdx]);
+}
+
+function fitness(i) {
+  if (bfin[i] >= 0) return 5000 + (TMAX - bfin[i]) * 40;
+  const tgt = targetOf(i);
+  return bleg[i] * 800 - Math.hypot(tgt.x - bx[i], tgt.y - by[i]);
+}
+
+function endGeneration() {
+  for (let i = 0; i < N; i++) prog[i] = fitness(i);
+  const order = Array.from(rank).sort((a, b) => prog[b] - prog[a]);
+  const best = prog[order[0]], mean = prog.reduce((a, v) => a + v, 0) / N;
+  let finished = 0, bestTime = null, gl = 0, gr = 0;
+  for (let i = 0; i < N; i++) {
+    if (bfin[i] >= 0) { finished++; if (bestTime === null || bfin[i] < bestTime) bestTime = bfin[i]; }
+    if (bgate[i] === 1) gl++; else if (bgate[i] === 2) gr++;
+  }
+  if (bestTime !== null && (bestEver === null || bestTime < bestEver)) bestEver = bestTime;
+  genHist.push({ gen, best, mean, finished, bestTime, gl, gr });
+
+  const next = new Float32Array(N * NP);
+  for (let e = 0; e < 50; e++) next.set(pop.subarray(order[e] * NP, order[e] * NP + NP), e * NP);
+  for (let c = 50; c < N; c++) {
+    const p = order[Math.floor(rnd() * 100)] * NP;
+    const o = c * NP;
+    for (let k = 0; k < NP; k++) next[o + k] = pop[p + k] + (rnd() < 0.3 ? gauss() * 0.2 : 0);
+  }
+  pop = next;
+  champIdx = 0;
+  gen++;
+  resetRace();
+  drawCharts();
+}
+
+function runGenHeadless() {
+  while (simT < TMAX) simStep();
+  endGeneration();
+  updateTiles();
+}
+
+/* ---------- live ranking (for boat colors) ---------- */
+let rankTimer = 0;
+function refreshRanks() {
+  for (let i = 0; i < N; i++) prog[i] = fitness(i);
+  rank = Int32Array.from(Array.from(rank).sort((a, b) => prog[b] - prog[a]));
+}
+
+/* ---------- race canvas ---------- */
+const canvas = document.getElementById("race");
+const ctx = canvas.getContext("2d");
+const DPR = Math.min(devicePixelRatio || 1, 2);
+let SC = 1;
+function sizeCanvas() {
+  const w = canvas.clientWidth || LW;
+  const h = Math.round(w * LH / LW);
+  canvas.width = w * DPR; canvas.height = h * DPR;
+  canvas.style.height = h + "px";
+  SC = w / LW;
+  ctx.setTransform(DPR * SC, 0, 0, DPR * SC, 0, 0);
+}
+sizeCanvas();
+addEventListener("resize", sizeCanvas);
+
+function buoy(x, y, color, label, dx = 14, dy = 4) {
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(x, y, 7, 0, TAU); ctx.fill();
+  ctx.strokeStyle = T.card; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, 7, 0, TAU); ctx.stroke();
+  if (label) {
+    ctx.font = "600 11px Futura, Avenir Next, sans-serif";
+    ctx.fillStyle = T.ink3;
+    ctx.fillText(label, x + dx, y + dy);
+  }
+}
+
+function drawCourse(t) {
+  const sea = ctx.createLinearGradient(0, 0, 0, LH);
+  sea.addColorStop(0, T.seaFar); sea.addColorStop(1, T.seaDeep);
+  ctx.fillStyle = sea; ctx.fillRect(0, 0, LW, LH);
+
+  // wind chevrons drifting downwind
+  ctx.strokeStyle = T.card; ctx.globalAlpha = 0.3; ctx.lineWidth = 1.5;
+  const drift = reducedMotion ? 0 : (t * 26) % 90;
+  for (let y = -90 + drift; y < LH; y += 90) {
+    for (let x = 60; x < LW; x += 150) {
+      ctx.beginPath();
+      ctx.moveTo(x - 7, y - 5); ctx.lineTo(x, y + 3); ctx.lineTo(x + 7, y - 5);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // course path hint: M1 → gate → M1 → M3 → finish
+  ctx.strokeStyle = T.ink3; ctx.globalAlpha = 0.25; ctx.setLineDash([2, 6]); ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(LINE.mx, LINE.y);
+  ctx.lineTo(M1.x, M1.y);
+  ctx.lineTo((GL.x + GR.x) / 2, GL.y);
+  ctx.lineTo(M1.x, M1.y);
+  ctx.lineTo(M3.x, M3.y);
+  ctx.lineTo(FINC.x, FINC.y);
+  ctx.stroke();
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  // laylines at M1
+  ctx.strokeStyle = T.ink3; ctx.globalAlpha = 0.4; ctx.setLineDash([6, 6]); ctx.lineWidth = 1;
+  const lay = 42 * Math.PI / 180;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(M1.x, M1.y);
+    ctx.lineTo(M1.x + Math.sin(lay) * 420 * s, M1.y + Math.cos(lay) * 420);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  // start line: solid + orange while closed, dashed after the gun
+  const closed = simT < 0;
+  ctx.strokeStyle = closed ? T.model : T.ink3;
+  ctx.lineWidth = closed ? 2.5 : 1.5;
+  if (!closed) ctx.setLineDash([4, 5]);
+  ctx.beginPath(); ctx.moveTo(LINE.x1, LINE.y); ctx.lineTo(LINE.x2, LINE.y); ctx.stroke();
+  ctx.setLineDash([]);
+  buoy(LINE.x1, LINE.y, T.ink2, "START", -58, 4);
+  buoy(LINE.x2, LINE.y, T.ink2, null);
+
+  // finish line: vertical, crossed on a beam reach
+  ctx.strokeStyle = T.ink3; ctx.setLineDash([4, 5]); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(FINC.x, FINC.y - 26); ctx.lineTo(FINC.x, FINC.y + 26); ctx.stroke();
+  ctx.setLineDash([]);
+  buoy(FINC.x, FINC.y - 26, T.ink2, "FINISH", 12, 0);
+  buoy(FINC.x, FINC.y + 26, T.ink2, null);
+
+  // marks
+  buoy(M1.x, M1.y, T.model, "MARK 1");
+  buoy(GL.x, GL.y, T.model, "GATE L", -62, 22);
+  buoy(GR.x, GR.y, T.model, "GATE R", 12, 22);
+  buoy(M3.x, M3.y, T.model, "MARK 3", -62, 22);
+
+  // wind arrow
+  ctx.save();
+  ctx.translate(46, 44);
+  ctx.strokeStyle = T.ink; ctx.fillStyle = T.ink; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(0, 16); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(-6, 6); ctx.lineTo(6, 6); ctx.closePath(); ctx.fill();
+  ctx.font = "600 13px ui-monospace, SF Mono, Menlo, monospace";
+  ctx.fillText("WIND 18kt", 16, 4);
+  ctx.restore();
+
+  // HUD top right: gen + clock / countdown
+  ctx.font = "600 13px Futura, Avenir Next, sans-serif";
+  ctx.fillStyle = T.ink2;
+  ctx.textAlign = "right";
+  const clock = simT < 0 ? "GUN IN " + (-simT).toFixed(1) + "s" : simT.toFixed(1) + "s / " + TMAX + "s";
+  ctx.fillText("GEN " + gen + "   ·   " + clock, LW - 24, 40);
+  ctx.textAlign = "left";
+
+  // big countdown banner during prestart
+  if (closed) {
+    ctx.font = "600 26px Futura, Avenir Next, sans-serif";
+    ctx.fillStyle = T.model;
+    ctx.textAlign = "center";
+    ctx.fillText("START SEQUENCE — " + Math.ceil(-simT) + "s", LW / 2, 48);
+    ctx.textAlign = "left";
+  }
+}
+
+function drawFleet() {
+  if (champTrail.length > 4) {
+    ctx.strokeStyle = T.model; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(champTrail[0], champTrail[1]);
+    for (let k = 2; k < champTrail.length; k += 2) ctx.lineTo(champTrail[k], champTrail[k + 1]);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  const tiers = [
+    { from: 100, to: N, color: T.ghost, alpha: 0.35, size: 5 },
+    { from: 10, to: 100, color: T.rival, alpha: 0.8, size: 6 },
+    { from: 0, to: 10, color: T.model, alpha: 1, size: 7.5 },
+  ];
+  for (const tier of tiers) {
+    ctx.fillStyle = tier.color;
+    ctx.globalAlpha = tier.alpha;
+    ctx.beginPath();
+    for (let r = tier.from; r < tier.to; r++) {
+      const i = rank[r];
+      const x = bx[i], y = by[i], h = bh[i], s = tier.size;
+      const ca = Math.cos(h), sa = Math.sin(h);
+      ctx.moveTo(x + ca * s, y + sa * s);
+      ctx.lineTo(x - ca * s * 0.7 - sa * s * 0.55, y - sa * s * 0.7 + ca * s * 0.55);
+      ctx.lineTo(x - ca * s * 0.7 + sa * s * 0.55, y - sa * s * 0.7 - ca * s * 0.55);
+      ctx.closePath();
+    }
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- charts ---------- */
+const FW = 500, FH = 300, M = { l: 52, r: 14, t: 12, b: 30 };
+function lineChart(svg, series, yFmt, xLabel) {
+  const all = series.flatMap((s) => s.vals);
+  if (all.length < 2) {
+    svg.innerHTML = `<text x="${FW / 2}" y="${FH / 2}" text-anchor="middle">Waiting for generations…</text>`;
+    return;
+  }
+  const xMin = 1, xMax = Math.max(...all.map((p) => p.x));
+  let yMin = Math.min(...all.map((p) => p.y)), yMax = Math.max(...all.map((p) => p.y));
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  const pad = (yMax - yMin) * 0.08; yMin -= pad; yMax += pad;
+  const X = (x) => M.l + (x - xMin) / Math.max(1, xMax - xMin) * (FW - M.l - M.r);
+  const Y = (y) => FH - M.b - (y - yMin) / (yMax - yMin) * (FH - M.t - M.b);
+  let g = "";
+  for (let k = 0; k <= 4; k++) {
+    const v = yMin + (yMax - yMin) * k / 4;
+    g += `<line class="gridline" x1="${M.l}" y1="${Y(v)}" x2="${FW - M.r}" y2="${Y(v)}"/>`
+       + `<text x="${M.l - 6}" y="${Y(v) + 3}" text-anchor="end">${yFmt(v)}</text>`;
+  }
+  for (const s of series) {
+    let p = "";
+    const step = Math.max(1, Math.floor(s.vals.length / 240));
+    for (let i = 0; i < s.vals.length; i += step) p += (p ? " L" : "M") + X(s.vals[i].x).toFixed(1) + " " + Y(s.vals[i].y).toFixed(1);
+    const last = s.vals[s.vals.length - 1];
+    p += ` L ${X(last.x).toFixed(1)} ${Y(last.y).toFixed(1)}`;
+    g += `<path class="${s.cls}" d="${p}"/>`;
+    g += `<circle cx="${X(last.x).toFixed(1)}" cy="${Y(last.y).toFixed(1)}" r="3.5" fill="var(${s.cls === "s-mean" ? "--rival" : "--model"})"/>`;
+  }
+  g += `<line class="axisline" x1="${M.l}" y1="${FH - M.b}" x2="${FW - M.r}" y2="${FH - M.b}"/>`;
+  g += `<text x="${M.l}" y="${FH - M.b + 16}">${xLabel} ${xMin}</text>`;
+  g += `<text x="${FW - M.r}" y="${FH - M.b + 16}" text-anchor="end">${xLabel} ${xMax}</text>`;
+  svg.innerHTML = g;
+}
+
+const fitSvg = document.getElementById("fitSvg"), timeSvg = document.getElementById("timeSvg");
+const fitTip = document.getElementById("fitTip"), timeTip = document.getElementById("timeTip");
+function drawCharts() {
+  lineChart(fitSvg, [
+    { vals: genHist.map((h) => ({ x: h.gen, y: h.mean })), cls: "s-mean" },
+    { vals: genHist.map((h) => ({ x: h.gen, y: h.best })), cls: "s-best" },
+  ], (v) => v.toFixed(0), "gen");
+  const times = genHist.filter((h) => h.bestTime !== null).map((h) => ({ x: h.gen, y: h.bestTime }));
+  lineChart(timeSvg, [{ vals: times, cls: "s-time" }], (v) => v.toFixed(1) + "s", "gen");
+
+  document.getElementById("histTable").innerHTML =
+    "<tr><th>Gen</th><th>Best</th><th>Mean</th><th>Finished</th><th>Best time</th><th>Gate L/R</th></tr>" +
+    genHist.map((h) => `<tr><td>${h.gen}</td><td>${h.best.toFixed(0)}</td><td>${h.mean.toFixed(0)}</td><td>${h.finished}</td><td>${h.bestTime ? h.bestTime.toFixed(1) + "s" : "—"}</td><td>${h.gl}/${h.gr}</td></tr>`).join("");
+}
+function tipHandler(svg, tip, getText) {
+  svg.addEventListener("pointermove", (ev) => {
+    if (genHist.length < 2) return;
+    const r = svg.getBoundingClientRect();
+    const mx = (ev.clientX - r.left) / r.width * FW;
+    const gi = Math.round((mx - M.l) / (FW - M.l - M.r) * (genHist.length - 1));
+    if (gi < 0 || gi >= genHist.length) { tip.style.opacity = 0; return; }
+    const text = getText(genHist[gi]);
+    if (!text) { tip.style.opacity = 0; return; }
+    tip.style.opacity = 1;
+    tip.style.left = (mx / FW * r.width + svg.offsetLeft) + "px";
+    tip.style.top = (svg.offsetTop + 34) + "px";
+    tip.textContent = text;
+  });
+  svg.addEventListener("pointerleave", () => tip.style.opacity = 0);
+}
+tipHandler(fitSvg, fitTip, (h) => `gen ${h.gen} · best ${h.best.toFixed(0)} · mean ${h.mean.toFixed(0)}`);
+tipHandler(timeSvg, timeTip, (h) => h.bestTime ? `gen ${h.gen} · best ${h.bestTime.toFixed(1)}s` : null);
+
+/* ---------- instruments ---------- */
+const $ = (id) => document.getElementById(id);
+function updateTiles() {
+  $("genV").textContent = gen;
+  $("clockV").innerHTML = simT < 0
+    ? "−" + (-simT).toFixed(1) + " <small>s</small>"
+    : simT.toFixed(1) + " <small>s</small>";
+  let maxLeg = 0, finished = 0, gl = 0, gr = 0;
+  for (let i = 0; i < N; i++) {
+    if (bfin[i] >= 0) { finished++; maxLeg = 6; }
+    else if (bleg[i] > maxLeg) maxLeg = bleg[i];
+    if (bgate[i] === 1) gl++; else if (bgate[i] === 2) gr++;
+  }
+  $("legV").textContent = simT < 0 ? "Prestart" : (maxLeg >= 6 ? "Finished" : LEG_NAMES[maxLeg]);
+  $("gateV").textContent = gl + " / " + gr;
+  $("finV").textContent = finished;
+  $("bestV").innerHTML = bestEver === null ? "— <small>s</small>" : bestEver.toFixed(1) + " <small>s</small>";
+}
+
+/* ---------- main loop ---------- */
+initFleet();          // must run after all chart/tile helpers above exist
+let running = false, lastT = 0, uiTimer = 0;
+const runBtn = $("runBtn");
+function loop(ts) {
+  const t = ts / 1000;
+  const dt = Math.min(0.05, t - lastT || 0.016);
+  lastT = t;
+
+  if (running) {
+    stepAcc += +$("speedSel").value;
+    while (stepAcc >= 1) {
+      stepAcc -= 1;
+      simStep();
+      if (simT >= TMAX) { endGeneration(); break; }
+    }
+    rankTimer += dt;
+    if (rankTimer > 0.12) { rankTimer = 0; refreshRanks(); }
+    uiTimer += dt;
+    if (uiTimer > 0.2) { uiTimer = 0; updateTiles(); }
+  }
+
+  drawCourse(t);
+  drawFleet();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+runBtn.addEventListener("click", () => {
+  running = !running;
+  runBtn.textContent = running ? "Pause" : "Resume";
+  runBtn.classList.toggle("primary", !running);
+});
+$("skipBtn").addEventListener("click", () => {
+  runGenHeadless();
+  refreshRanks();
+});
+$("resetBtn").addEventListener("click", () => {
+  rs = (Date.now() & 0xffffffff) >>> 0;
+  initFleet();
+  refreshRanks();
+  if (!running) { runBtn.textContent = "Start evolution"; runBtn.classList.add("primary"); }
+});
+</script>

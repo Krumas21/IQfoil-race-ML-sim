@@ -1,0 +1,46 @@
+[
+  {
+    "date": "2026-06-20",
+    "wind_speed_knots": 12,
+    "board_size": 95,
+    "sail_size": 9.0,
+    "location": "Kaunas Lagoon",
+    "duration_minutes": 120,
+    "session_type": "training",
+    "result": null,
+    "notes": "Light wind pumping drills"
+  },
+  {
+    "date": "2026-06-28",
+    "wind_speed_knots": 22,
+    "board_size": 95,
+    "sail_size": 8.0,
+    "location": "Nida",
+    "duration_minutes": 75,
+    "session_type": "race",
+    "result": 5,
+    "notes": "Overpowered on reaches"
+  },
+  {
+    "date": "2026-07-05",
+    "wind_speed_knots": 17,
+    "board_size": 95,
+    "sail_size": 9.0,
+    "location": "Nida",
+    "duration_minutes": 90,
+    "session_type": "race",
+    "result": 2,
+    "notes": "Great starts, clean foiling"
+  },
+  {
+    "date": "2026-07-14",
+    "wind_speed_knots": 18,
+    "board_size": 95,
+    "sail_size": 8.0,
+    "location": "Kaunas Lagoon",
+    "duration_minutes": 90,
+    "session_type": "training",
+    "result": null,
+    "notes": "Pumping technique upwind, chop from SW"
+  }
+]
