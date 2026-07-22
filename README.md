@@ -15,6 +15,10 @@ Part of **The 35 to 24 Project** — a windsurfer's push from 35th to 24th, with
 Open the file in any browser. No build, no server, no dependencies — everything
 (physics, neural networks, evolution, rendering) is hand-coded vanilla JS in one file.
 
+Wind is not steady: it oscillates up to ±17° over the race and roaming gust/lull
+cells speed up or slow down whatever water they cover, so the favored side and the
+laylines move under the fleet.
+
 ### The course
 
 Real iQFoil race format, top-down view, wind from the top:
@@ -38,6 +42,12 @@ Real iQFoil race format, top-down view, wind from the top:
 4. **Run** downwind to the leeward gate — each boat freely chooses the left or right buoy.
 5. **Second beat** back up to Mark 1.
 6. **Reach** to Mark 3 (downwind-left of the start), then a **half-wind sprint** to the finish.
+
+Every mark must be **properly rounded** — the boat has to sweep far enough around the
+buoy in the correct direction (port at Mark 1, and the gate/Mark 3 mirrored) and be
+heading onto the next leg before the rounding counts. A drive-by through the zone
+does nothing. The finish is a **directional line crossing** (left to right on the beam
+reach), not a proximity touch.
 
 ### The boats
 
@@ -67,8 +77,10 @@ What emerges, unprogrammed:
 - **Fleet herding** at the gate — the population usually converges on one side within
   ~30 generations, just like a real fleet finding the favored gate
 
-Measured on the current settings: first finishers around generation 10; by generation 100
-roughly 750/1000 boats complete the course and the best race time drops from ~70s to ~51s.
+Measured on the current settings (proper roundings + shifting wind): first finishers
+around generation 10; by generation 100 roughly 600/1000 boats complete the whole course
+and the best race time drops from ~83s to ~50s, while the fleet herds almost entirely
+onto one gate (985/0 by gen 100 in a sample run).
 
 ### Controls
 
@@ -107,9 +119,9 @@ python3 -m venv .venv && .venv/bin/pip install numpy
 
 - [x] Session tracker CLI (dicts → class → JSON persistence → NumPy stats → argparse)
 - [x] Browser ML demo: supervised fit of sail size vs wind (v1)
-- [x] Browser ML demo: evolutionary fleet racing on a full course (current)
-- [ ] Proper mark roundings (port-side, crossing-direction checks)
-- [ ] Wind shifts and gusts during a race
+- [x] Browser ML demo: evolutionary fleet racing on a full course
+- [x] Proper mark roundings (directional sweep + exit-heading checks, directional finish line)
+- [x] Wind shifts and gusts during a race (oscillating shifts + roaming gust/lull cells)
 - [ ] **M8**: PyTorch model predicting equipment setup from real logged sessions
 
 ## Why evolution and not backprop?

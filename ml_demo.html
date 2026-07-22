@@ -278,7 +278,9 @@
       <h3>The course</h3>
       <p>Real iQFoil shape: start sequence (compressed to 18s here — real racing uses 3 minutes),
         line closed until the gun, upwind beat, leeward gate with a free left/right choice, second
-        beat, reach to Mark 3, half-wind finish. Rounding is simplified to touching the mark zone.</p>
+        beat, reach to Mark 3, half-wind finish. Marks must be properly rounded — enough sweep
+        around the buoy in the correct direction (port at Mark 1) — and every race sails through
+        wind shifts up to ±17° plus roaming gusts and lulls.</p>
     </div>
     <div class="note">
       <h3>The learning</h3>
@@ -338,10 +340,24 @@ const GL = { x: 455, y: 460 }, GR = { x: 625, y: 460 };
 const M3 = { x: 240, y: 560 };
 const FINC = { x: 540, y: 590 };                      // finish line centre, crossed on a beam reach
 const R = 24;
-const VMAX = 60, TURN = 2.6, DT = 1 / 15, PRE = 18, TMAX = 80;
+const VMAX = 60, TURN = 2.6, DT = 1 / 15, PRE = 18, TMAX = 95;
+const DEG = Math.PI / 180;
 const LEG_NAMES = ["Start line", "Beat to M1", "Run to gate", "Beat 2 to M1", "Reach to M3", "Final reach"];
 // legs: 0 cross start line, 1 M1, 2 gate (L or R), 3 M1 again, 4 M3, 5 finish
 const TGT = [{ x: LINE.mx, y: LINE.y }, M1, null, M1, M3, FINC];
+
+// Proper mark roundings. dir −1 = port rounding (counterclockwise sweep on
+// screen), +1 = starboard. A rounding counts only when the boat, while inside
+// `track` px of the mark, has swept `need` radians around it in the correct
+// direction AND is heading toward the next leg (`exit`) — so a drive-by past
+// the zone can never score as a rounding. M3 is a starboard rounding because
+// the turn toward the finish is a right-hander on this course geometry.
+const ROUNDING = {
+  1: { dir: -1, need: 2.4, track: 60, exit: (h) => Math.sin(h) > 0.2 },
+  3: { dir: -1, need: 2.4, track: 60, exit: (h) => Math.sin(h) > 0.2 },
+  4: { dir: 1, need: 2.0, track: 60, exit: (h) => Math.cos(h) > 0.2 },
+};
+const GATE_ROUNDING = { need: 1.2, track: 48, exit: (h) => Math.sin(h) < -0.2 };
 
 /* ---------- population: 1000 policies, 7-8-1 each ---------- */
 const N = 1000, NIN = 7, NH = 8, NP = NIN * NH + NH + NH + 1;   // 73 weights
@@ -349,7 +365,7 @@ let rs = 123;
 const rnd = () => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 2 ** 32; };
 const gauss = () => { const u = rnd() || 1e-9, v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
 
-let pop, bx, by, bh, bleg, bfin, bgate, prog, rank;
+let pop, bx, by, bh, bleg, bfin, bgate, prog, rank, bacc, bang;
 let gen, simT, stepAcc, genHist, bestEver, champTrail, champIdx;
 
 function gateTarget(i) {
@@ -357,6 +373,54 @@ function gateTarget(i) {
 }
 function targetOf(i) {
   return bleg[i] === 2 ? gateTarget(i) : TGT[bleg[i]];
+}
+function roundSpec(i) {
+  if (bleg[i] === 2) {
+    const mk = gateTarget(i);
+    // left gate is rounded to port, right gate to starboard — mirrored turns
+    return { mk, dir: mk === GL ? -1 : 1, ...GATE_ROUNDING };
+  }
+  const r = ROUNDING[bleg[i]];
+  return r ? { mk: TGT[bleg[i]], ...r } : null;
+}
+
+/* ---------- weather: per-generation wind shifts + gust cells ---------- */
+// Same seeded RNG as evolution, drawn at every race reset, so animated and
+// headless (Skip) runs stay bit-identical.
+let windP;
+function makeWeather() {
+  const cells = [];
+  for (let k = 0; k < 8; k++) cells.push({
+    x: rnd() * LW, y: rnd() * (LH + 240) - 120,
+    rx: 80 + rnd() * 70, spd: 30 + rnd() * 26,
+    swayA: 10 + rnd() * 25, swayF: TAU / (9 + rnd() * 8), swayP: rnd() * TAU,
+    boost: k < 5 ? 1.3 : 0.78,          // 5 gusts, 3 lulls
+  });
+  windP = {
+    a1: (5 + rnd() * 7) * DEG, f1: TAU / (16 + rnd() * 14), p1: rnd() * TAU,
+    a2: (2 + rnd() * 3) * DEG, f2: TAU / (5 + rnd() * 5), p2: rnd() * TAU,
+    cells,
+  };
+}
+// two superposed sinusoids ≈ oscillating shifts up to ±17°
+function windFrom(t) {
+  return WIND_FROM + windP.a1 * Math.sin(windP.f1 * t + windP.p1)
+                   + windP.a2 * Math.sin(windP.f2 * t + windP.p2);
+}
+function cellPos(c, t) {
+  const yr = LH + 240;
+  let y = (c.y + (t + PRE) * c.spd) % yr;
+  if (y < 0) y += yr;
+  return { x: c.x + Math.sin(c.swayF * t + c.swayP) * c.swayA, y: y - 120 };
+}
+function gustAt(x, y) {
+  let f = 1;
+  for (const c of windP.cells) {
+    const p = cellPos(c, simT);
+    const dx = (x - p.x) / c.rx, dy = (y - p.y) / (c.rx * 0.72);
+    if (dx * dx + dy * dy < 1) f *= c.boost;
+  }
+  return Math.min(1.5, Math.max(0.65, f));
 }
 
 function initFleet() {
@@ -380,7 +444,10 @@ function resetRace() {
   bleg = new Int8Array(N);
   bfin = new Float32Array(N).fill(-1);
   bgate = new Int8Array(N);                    // 0 none, 1 left, 2 right
+  bacc = new Float32Array(N);                  // swept angle around current mark
+  bang = new Float32Array(N).fill(9);          // last mark bearing; 9 = outside zone
   prog = new Float32Array(N);
+  makeWeather();
   rank = new Int32Array(N);
   for (let i = 0; i < N; i++) rank[i] = i;
   simT = -PRE; stepAcc = 0;
@@ -402,21 +469,22 @@ function steer(i, inp) {
 const inp = new Float32Array(NIN);
 function simStep() {
   const pre = simT < 0;
+  const wdir = windFrom(simT);
   for (let i = 0; i < N; i++) {
     if (bfin[i] >= 0) continue;
     const tgt = pre ? TGT[0] : targetOf(i);
     const dx = tgt.x - bx[i], dy = tgt.y - by[i];
     const dist = Math.hypot(dx, dy);
     const err = wrap(Math.atan2(dy, dx) - bh[i]);
-    const rw = wrap(WIND_FROM - bh[i]);
+    const rw = wrap(wdir - bh[i]);
     inp[0] = Math.sin(err); inp[1] = Math.cos(err);
     inp[2] = Math.sin(rw);  inp[3] = Math.cos(rw);
     inp[4] = dist / 500;
     inp[5] = pre ? -simT / PRE : 0;            // countdown feature, 1 → 0 before the gun
     inp[6] = bleg[i] / 5;
     bh[i] = wrap(bh[i] + steer(i, inp) * TURN * DT);
-    const v = VMAX * polar(Math.abs(rw) * 180 / Math.PI);
-    const py = by[i];
+    const v = VMAX * polar(Math.abs(rw) * 180 / Math.PI) * gustAt(bx[i], by[i]);
+    const pxi = bx[i], py = by[i];
     bx[i] += Math.cos(bh[i]) * v * DT;
     by[i] += Math.sin(bh[i]) * v * DT;
 
@@ -427,12 +495,25 @@ function simStep() {
     }
     if (bleg[i] === 0) {
       if (py >= LINE.y && by[i] < LINE.y && bx[i] >= LINE.x1 && bx[i] <= LINE.x2) bleg[i] = 1;
-    } else if (bleg[i] === 2) {
-      if (Math.hypot(GL.x - bx[i], GL.y - by[i]) < R) { bgate[i] = 1; bleg[i] = 3; }
-      else if (Math.hypot(GR.x - bx[i], GR.y - by[i]) < R) { bgate[i] = 2; bleg[i] = 3; }
-    } else if (Math.hypot(tgt.x - bx[i], tgt.y - by[i]) < R) {
-      if (bleg[i] === 5) bfin[i] = simT;
-      else bleg[i]++;
+    } else if (bleg[i] === 5) {
+      // finish is a directional line crossing: left to right, on the beam reach
+      if (pxi < FINC.x && bx[i] >= FINC.x && Math.abs(by[i] - FINC.y) <= 26) bfin[i] = simT;
+    } else {
+      const spec = roundSpec(i);
+      const d = Math.hypot(spec.mk.x - bx[i], spec.mk.y - by[i]);
+      if (d < spec.track) {
+        const ang = Math.atan2(by[i] - spec.mk.y, bx[i] - spec.mk.x);
+        if (bang[i] < 9) bacc[i] += wrap(ang - bang[i]);
+        bang[i] = ang;
+        if (bacc[i] * spec.dir >= spec.need && spec.exit(bh[i])) {
+          if (bleg[i] === 2) bgate[i] = spec.mk === GL ? 1 : 2;
+          bleg[i]++;
+          bacc[i] = 0; bang[i] = 9;
+        }
+      } else {
+        // left the zone without completing — the rounding starts over
+        bacc[i] = 0; bang[i] = 9;
+      }
     }
   }
   simT += DT;
@@ -442,7 +523,13 @@ function simStep() {
 function fitness(i) {
   if (bfin[i] >= 0) return 5000 + (TMAX - bfin[i]) * 40;
   const tgt = targetOf(i);
-  return bleg[i] * 800 - Math.hypot(tgt.x - bx[i], tgt.y - by[i]);
+  let f = bleg[i] * 800 - Math.hypot(tgt.x - bx[i], tgt.y - by[i]);
+  // shaped credit for a partial rounding, so evolution has a gradient to climb
+  if (bleg[i] >= 1 && bleg[i] <= 4) {
+    const spec = roundSpec(i);
+    f += Math.min(1, Math.max(0, bacc[i] * spec.dir) / spec.need) * 250;
+  }
+  return f;
 }
 
 function endGeneration() {
@@ -513,20 +600,33 @@ function buoy(x, y, color, label, dx = 14, dy = 4) {
 }
 
 function drawCourse(t) {
+  const shift = wrap(windFrom(simT) - WIND_FROM);
   const sea = ctx.createLinearGradient(0, 0, 0, LH);
   sea.addColorStop(0, T.seaFar); sea.addColorStop(1, T.seaDeep);
   ctx.fillStyle = sea; ctx.fillRect(0, 0, LW, LH);
 
-  // wind chevrons drifting downwind
+  // gust cells (dark water) and lulls (glassy patches) drifting downwind
+  for (const c of windP.cells) {
+    const p = cellPos(c, simT);
+    ctx.fillStyle = c.boost > 1 ? T.ink : T.card;
+    ctx.globalAlpha = c.boost > 1 ? 0.07 : 0.16;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, c.rx, c.rx * 0.72, 0, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // wind chevrons drifting downwind, rotated by the current shift
+  ctx.save();
+  ctx.translate(LW / 2, LH / 2); ctx.rotate(shift); ctx.translate(-LW / 2, -LH / 2);
   ctx.strokeStyle = T.card; ctx.globalAlpha = 0.3; ctx.lineWidth = 1.5;
   const drift = reducedMotion ? 0 : (t * 26) % 90;
-  for (let y = -90 + drift; y < LH; y += 90) {
-    for (let x = 60; x < LW; x += 150) {
+  for (let y = -90 + drift; y < LH + 90; y += 90) {
+    for (let x = -90; x < LW + 90; x += 150) {
       ctx.beginPath();
       ctx.moveTo(x - 7, y - 5); ctx.lineTo(x, y + 3); ctx.lineTo(x + 7, y - 5);
       ctx.stroke();
     }
   }
+  ctx.restore();
   ctx.globalAlpha = 1;
 
   // course path hint: M1 → gate → M1 → M3 → finish
@@ -541,13 +641,14 @@ function drawCourse(t) {
   ctx.stroke();
   ctx.setLineDash([]); ctx.globalAlpha = 1;
 
-  // laylines at M1
+  // laylines at M1, swinging with the live wind direction
   ctx.strokeStyle = T.ink3; ctx.globalAlpha = 0.4; ctx.setLineDash([6, 6]); ctx.lineWidth = 1;
-  const lay = 42 * Math.PI / 180;
+  const lay = 42 * DEG;
   for (const s of [-1, 1]) {
+    const a = Math.PI / 2 + shift + lay * s;
     ctx.beginPath();
     ctx.moveTo(M1.x, M1.y);
-    ctx.lineTo(M1.x + Math.sin(lay) * 420 * s, M1.y + Math.cos(lay) * 420);
+    ctx.lineTo(M1.x + Math.cos(a) * 420, M1.y + Math.sin(a) * 420);
     ctx.stroke();
   }
   ctx.setLineDash([]); ctx.globalAlpha = 1;
@@ -575,14 +676,18 @@ function drawCourse(t) {
   buoy(GR.x, GR.y, T.model, "GATE R", 12, 22);
   buoy(M3.x, M3.y, T.model, "MARK 3", -62, 22);
 
-  // wind arrow
+  // wind arrow, rotated by the live shift, with the shift read out in degrees
   ctx.save();
   ctx.translate(46, 44);
   ctx.strokeStyle = T.ink; ctx.fillStyle = T.ink; ctx.lineWidth = 2.5;
+  ctx.save();
+  ctx.rotate(shift);
   ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(0, 16); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(-6, 6); ctx.lineTo(6, 6); ctx.closePath(); ctx.fill();
+  ctx.restore();
   ctx.font = "600 13px ui-monospace, SF Mono, Menlo, monospace";
-  ctx.fillText("WIND 18kt", 16, 4);
+  const sd = shift / DEG;
+  ctx.fillText("WIND 18kt " + (sd >= 0 ? "+" : "−") + Math.abs(sd).toFixed(0) + "°", 16, 4);
   ctx.restore();
 
   // HUD top right: gen + clock / countdown
