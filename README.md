@@ -44,10 +44,18 @@ Real iQFoil race format, top-down view, wind from the top:
 6. **Reach** to Mark 3 (downwind-left of the start), then a **half-wind sprint** to the finish.
 
 Every mark must be **properly rounded** — the boat has to sweep far enough around the
-buoy in the correct direction (port at Mark 1, and the gate/Mark 3 mirrored) and be
-heading onto the next leg before the rounding counts. A drive-by through the zone
-does nothing. The finish is a **directional line crossing** (left to right on the beam
+buoy in the correct direction (Mark 1 right-to-left, gates rounded from the inside,
+Mark 3 mirrored) and be heading onto the next leg before the rounding counts. Taking a
+mark on the **wrong side** is a foul: the boat is penalized in fitness and scores no
+rounding, so evolution is pushed to round cleanly. A drive-by through the zone does
+nothing. The finish is a **directional line crossing** (left to right on the beam
 reach), not a proximity touch.
+
+**The start is scored too.** During the countdown the line is closed, so boats must work
+it: at the gun each boat is rewarded for being **at speed** (not parked), **close under
+the line**, and at the **favored end** — the more-upwind pin or boat end, which the sim
+highlights and which swaps as the wind shifts. Every weight starts as Gaussian noise —
+this is training from zero, no pretraining or imitation; only the reward is engineered.
 
 ### The boats
 
@@ -77,10 +85,11 @@ What emerges, unprogrammed:
 - **Fleet herding** at the gate — the population usually converges on one side within
   ~30 generations, just like a real fleet finding the favored gate
 
-Measured on the current settings (proper roundings + shifting wind): first finishers
-around generation 10; by generation 100 roughly 600/1000 boats complete the whole course
-and the best race time drops from ~83s to ~50s, while the fleet herds almost entirely
-onto one gate (985/0 by gen 100 in a sample run).
+Measured on the current settings (proper roundings + wrong-side fouls + scored starts +
+shifting wind): first finishers around generation 10; by generation 100 roughly 650/1000
+boats complete the whole course and the best race time drops from ~90s to ~50s. Over the
+same run the fleet herds almost entirely onto one gate and the mean start-quality score
+climbs steadily — evolution learns to work the line, not just the course.
 
 ### Controls
 

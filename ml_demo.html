@@ -284,10 +284,18 @@
     </div>
     <div class="note">
       <h3>The learning</h3>
-      <p>Each board is a 7&nbsp;→&nbsp;8&nbsp;→&nbsp;1 net (73 weights) reading mark bearing, wind
-        angle, countdown, and leg number — output steers. An <strong>evolution strategy</strong>
-        trains them: race all 1,000, keep the top 10%, mutate, repeat. No gradients,
+      <p>Every weight starts as pure Gaussian noise — no pretraining, no imitation. Each board is
+        a 7&nbsp;→&nbsp;8&nbsp;→&nbsp;1 net (73 weights) reading mark bearing, wind angle, countdown,
+        and leg number — output steers. An <strong>evolution strategy</strong> trains them from
+        zero: race all 1,000, keep the top 10%, mutate, repeat. No gradients,
         no <code>loss.backward()</code>.</p>
+    </div>
+    <div class="note">
+      <h3>The start</h3>
+      <p>Boats must work the line during the countdown: the score at the gun rewards <strong>being
+        at speed</strong> (not parked), sitting <strong>close under the line</strong>, and being at
+        the <strong>favored end</strong> — the more-upwind pin or boat end, which glows orange and
+        swaps as the wind shifts.</p>
     </div>
     <div class="note">
       <h3>What emerges</h3>
@@ -350,8 +358,9 @@ const TGT = [{ x: LINE.mx, y: LINE.y }, M1, null, M1, M3, FINC];
 // screen), +1 = starboard. A rounding counts only when the boat, while inside
 // `track` px of the mark, has swept `need` radians around it in the correct
 // direction AND is heading toward the next leg (`exit`) — so a drive-by past
-// the zone can never score as a rounding. M3 is a starboard rounding because
-// the turn toward the finish is a right-hander on this course geometry.
+// the zone can never score as a rounding. A boat that sweeps against `dir`
+// (wrong side of the mark) is fouled and penalized in fitness. M3 is a
+// starboard rounding because the turn to the finish is a right-hander here.
 const ROUNDING = {
   1: { dir: -1, need: 2.4, track: 60, exit: (h) => Math.sin(h) > 0.2 },
   3: { dir: -1, need: 2.4, track: 60, exit: (h) => Math.sin(h) > 0.2 },
@@ -365,8 +374,8 @@ let rs = 123;
 const rnd = () => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 2 ** 32; };
 const gauss = () => { const u = rnd() || 1e-9, v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
 
-let pop, bx, by, bh, bleg, bfin, bgate, prog, rank, bacc, bang;
-let gen, simT, stepAcc, genHist, bestEver, champTrail, champIdx;
+let pop, bx, by, bh, bleg, bfin, bgate, prog, rank, bacc, bang, bstart, bfoul;
+let gen, simT, stepAcc, genHist, bestEver, champTrail, champIdx, gunDone;
 
 function gateTarget(i) {
   return Math.hypot(GL.x - bx[i], GL.y - by[i]) < Math.hypot(GR.x - bx[i], GR.y - by[i]) ? GL : GR;
@@ -422,6 +431,26 @@ function gustAt(x, y) {
   }
   return Math.min(1.5, Math.max(0.65, f));
 }
+// Favored (more-upwind) end of the start line for the live wind. A horizontal
+// line's upwind end depends only on the shift's sign: sin(shift) > 0 → boat
+// (right) end, else pin (left) end. Boats are steered here in the prestart and
+// rewarded for starting near it at speed.
+function favoredEndX(t) {
+  return Math.sin(windFrom(t) - WIND_FROM) > 0 ? LINE.x2 : LINE.x1;
+}
+// Snapshot each boat's start quality the instant the gun fires: reward being
+// at speed (moving, not parked), near the favored end, and close under the line.
+function captureStart() {
+  const favX = favoredEndX(simT);
+  for (let i = 0; i < N; i++) {
+    const rw = wrap(windFrom(simT) - bh[i]);
+    const v = polar(Math.abs(rw) * 180 / Math.PI) * gustAt(bx[i], by[i]);  // 0..~1.5
+    let s = Math.min(1, v) * 150;                        // moving at the gun
+    s += Math.max(0, 120 - Math.abs(bx[i] - favX) * 0.7); // near favored end
+    s += Math.max(0, 90 - (by[i] - LINE.y));             // close behind the line
+    bstart[i] = s;
+  }
+}
 
 function initFleet() {
   pop = new Float32Array(N * NP);
@@ -446,6 +475,9 @@ function resetRace() {
   bgate = new Int8Array(N);                    // 0 none, 1 left, 2 right
   bacc = new Float32Array(N);                  // swept angle around current mark
   bang = new Float32Array(N).fill(9);          // last mark bearing; 9 = outside zone
+  bstart = new Float32Array(N);                // start-quality bonus, set at the gun
+  bfoul = new Float32Array(N);                 // wrong-side rounding count (penalty)
+  gunDone = false;
   prog = new Float32Array(N);
   makeWeather();
   rank = new Int32Array(N);
@@ -469,10 +501,12 @@ function steer(i, inp) {
 const inp = new Float32Array(NIN);
 function simStep() {
   const pre = simT < 0;
+  if (!gunDone && !pre) { captureStart(); gunDone = true; }   // fires once, at the gun
   const wdir = windFrom(simT);
+  const preTgt = pre ? { x: favoredEndX(simT), y: LINE.y } : null;  // aim at favored end
   for (let i = 0; i < N; i++) {
     if (bfin[i] >= 0) continue;
-    const tgt = pre ? TGT[0] : targetOf(i);
+    const tgt = pre ? preTgt : targetOf(i);
     const dx = tgt.x - bx[i], dy = tgt.y - by[i];
     const dist = Math.hypot(dx, dy);
     const err = wrap(Math.atan2(dy, dx) - bh[i]);
@@ -510,8 +544,11 @@ function simStep() {
           bleg[i]++;
           bacc[i] = 0; bang[i] = 9;
         }
-      } else {
-        // left the zone without completing — the rounding starts over
+      } else if (bang[i] < 9) {
+        // left the zone without completing. A net sweep against the required
+        // direction means the boat passed the mark on the wrong side — a foul
+        // (Mark 1 must go right-to-left, gates rounded from the inside).
+        if (bacc[i] * spec.dir < -1.0) bfoul[i]++;
         bacc[i] = 0; bang[i] = 9;
       }
     }
@@ -521,15 +558,20 @@ function simStep() {
 }
 
 function fitness(i) {
-  if (bfin[i] >= 0) return 5000 + (TMAX - bfin[i]) * 40;
-  const tgt = targetOf(i);
-  let f = bleg[i] * 800 - Math.hypot(tgt.x - bx[i], tgt.y - by[i]);
-  // shaped credit for a partial rounding, so evolution has a gradient to climb
-  if (bleg[i] >= 1 && bleg[i] <= 4) {
-    const spec = roundSpec(i);
-    f += Math.min(1, Math.max(0, bacc[i] * spec.dir) / spec.need) * 250;
+  let f;
+  if (bfin[i] >= 0) {
+    f = 5000 + (TMAX - bfin[i]) * 40;
+  } else {
+    const tgt = targetOf(i);
+    f = bleg[i] * 800 - Math.hypot(tgt.x - bx[i], tgt.y - by[i]);
+    // shaped credit for a partial rounding, so evolution has a gradient to climb
+    if (bleg[i] >= 1 && bleg[i] <= 4) {
+      const spec = roundSpec(i);
+      f += Math.min(1, Math.max(0, bacc[i] * spec.dir) / spec.need) * 250;
+    }
   }
-  return f;
+  // start quality (rewarded even for finishers) minus wrong-side fouls
+  return f + bstart[i] - bfoul[i] * 600;
 }
 
 function endGeneration() {
@@ -660,8 +702,10 @@ function drawCourse(t) {
   if (!closed) ctx.setLineDash([4, 5]);
   ctx.beginPath(); ctx.moveTo(LINE.x1, LINE.y); ctx.lineTo(LINE.x2, LINE.y); ctx.stroke();
   ctx.setLineDash([]);
-  buoy(LINE.x1, LINE.y, T.ink2, "START", -58, 4);
-  buoy(LINE.x2, LINE.y, T.ink2, null);
+  // favored end glows — that's the rewarded end to start from
+  const favX = favoredEndX(simT);
+  buoy(LINE.x1, LINE.y, favX === LINE.x1 ? T.model : T.ink2, favX === LINE.x1 ? "PIN ★" : "PIN", -58, 4);
+  buoy(LINE.x2, LINE.y, favX === LINE.x2 ? T.model : T.ink2, favX === LINE.x2 ? "★ BOAT" : "BOAT", 12, 4);
 
   // finish line: vertical, crossed on a beam reach
   ctx.strokeStyle = T.ink3; ctx.setLineDash([4, 5]); ctx.lineWidth = 1.5;
